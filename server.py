@@ -269,13 +269,14 @@ Respond with general safe advice only.
       reply = safe_openai_response(user_prompt)
     
     # Update session messages
-    st.session_state.messages.append({"role":"user", "content":user_input})
+    st.session_state.messages.append({"role":"user", "content":reply})
     st.session_state.thinking = False
     st.experimental_rerun()
 
 if clear:
     st.session_state.messages = []
     st.experimental_rerun()
+
 
 
 

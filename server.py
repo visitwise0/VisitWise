@@ -31,13 +31,28 @@ st.markdown(
     }
     .visitwise-title {
         font-size: 34px;
-        font-weight: 700;
+        font-weight: 800;
         color: #2b7cff;
         margin-bottom: 4px;
     }
     .visitwise-subtitle {
         font-size: 15px;
         color: #475569;
+    }
+    
+    /* Send button styling */
+    div.stButton > button {
+        background-color: #2b7cff;
+        color: white;
+        border-radius: 10px;
+        padding: 6px 16px;
+        font-weight: 600;
+        border: none;
+    }
+
+    div.stButton > button:hover {
+        background-color: #1f66e5;
+        color: white;
     }
     </style>
     """,
@@ -125,9 +140,13 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+st.markdown('<div class="chat-card">', unsafe_allow_html=True)
+
 with st.form(key="chat_form", clear_on_submit=True):
     user_input = st.text_area("Describe your symptoms", height=60)
     send = st.form_submit_button("Send")
+
+st.markdown('</div>', unsafe_allow_html=True)
 
 # ---------- EMERGENCY REGEX ----------
 EMERGENCY_RE = re.compile(
@@ -211,6 +230,7 @@ if st.session_state.thinking:
 
 # ---------- FOOTER ----------
 st.markdown(f"<footer style='color:{COLORS['muted']}; margin-top:12px'>For emergencies call local services (999/112/911).</footer>", unsafe_allow_html=True)
+
 
 
 

@@ -5,17 +5,11 @@ import streamlit as st
 from openai import OpenAI
 
 # -----------------------------
-# PAGE CONFIG
+# App Config & Colors
 # -----------------------------
-st.set_page_config(
-    page_title="VisitWise — AI triage assistant",
-    page_icon="🩺",
-    layout="wide"
-)
+st.set_page_config(page_title="VisitWise — AI triage assistant", page_icon="💊", layout="wide")
 
-# -----------------------------
-# STYLING (matches your HTML)
-# -----------------------------
+# Inject CSS for colors and UI
 st.markdown("""
 <style>
 :root {
@@ -23,25 +17,40 @@ st.markdown("""
   --card:#ffffff;
   --accent:#2b7cff;
   --muted:#475569;
+  --soft:#eaf6ff;
+  --savebox-dark:#003a99;
+  --savebox-light:#4d8fff;
 }
-body { background-color: var(--bg); }
 
+/* Page background */
+body, .stApp {
+  background-color: var(--bg);
+  color: #0f172a;
+}
+
+/* Card styling */
 .card {
   background: var(--card);
   padding: 14px;
   border-radius: 12px;
   box-shadow: 0 8px 20px rgba(20,30,60,0.06);
+  margin-bottom: 12px;
 }
 
-.chatbox {
-  height: 480px;
-  overflow-y: auto;
-  padding: 12px;
+/* Buttons */
+.stButton>button {
+  background-color: var(--accent);
+  color: white;
   border-radius: 10px;
-  background: linear-gradient(180deg,#fff,#fbfeff);
-  border: 1px solid #e6f2ff;
+  padding: 8px 12px;
 }
 
+/* Secondary text */
+span, p {
+  color: var(--muted);
+}
+
+/* Chat bubbles */
 .msg-user {
   background: linear-gradient(90deg,#e6f4ff,#dbeeff);
   padding: 10px;
@@ -58,6 +67,27 @@ body { background-color: var(--bg); }
   max-width: 80%;
 }
 
+/* Profile saved box */
+.save-box {
+  padding: 10px;
+  border-radius: 8px;
+  color: white;
+  font-weight: 600;
+  text-align: center;
+  display: none;
+}
+
+.save-box.saved {
+  background-color: var(--savebox-light);
+  display: block;
+}
+
+.save-box.error {
+  background-color: red;
+  display: block;
+}
+
+/* Footer */
 footer {
   text-align: center;
   color: var(--muted);
@@ -68,46 +98,44 @@ footer {
 """, unsafe_allow_html=True)
 
 # -----------------------------
-# DATA / CONFIG
+# Load Medicines CSV
 # -----------------------------
 DATA_FOLDER = "data"
 CSV_PATH = os.path.join(DATA_FOLDER, "medicines.csv")
 
-EMERGENCY_RE = re.compile(
-    r"\bchest pain\b|\bdifficulty breathing\b|\bshortness of breath\b|\bunconscious\b|\bstroke\b",
-    re.IGNORECASE
-)
+# Fix double-extension bug if it exists
+if os.path.exists(os.path.join(DATA_FOLDER, "medicines.csv.csv")) and not os.path.exists(CSV_PATH):
+    os.rename(os.path.join(DATA_FOLDER, "medicines.csv.csv"), CSV_PATH)
 
-SYSTEM_PROMPT = """
-You are VisitWise, a triage assistant and symptom educator.
-Never diagnose or name illnesses.
-Give short, friendly, general advice only.
-"""
-
-# -----------------------------
-# API KEY
-# -----------------------------
-api_key = os.getenv("OPENAI_API_KEY")
-if not api_key:
-    st.error("OpenAI API key not found. Add it to Streamlit Secrets.")
-    st.stop()
-
-client = OpenAI(api_key=api_key)
-
-# -----------------------------
-# LOAD CSV
-# -----------------------------
 def load_medicines():
+    items = []
     if not os.path.exists(CSV_PATH):
-        return []
+        st.warning("medicines.csv not found")
+        return items
     with open(CSV_PATH, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+        reader = csv.DictReader(f)
+        for row in reader:
+            items.append(row)
+    return items
 
 MEDICINES = load_medicines()
 
 # -----------------------------
-# OPENAI CALL
+# OpenAI Client
 # -----------------------------
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+SYSTEM_PROMPT = """
+You are VisitWise, a triage assistant and symptom educator.
+
+RULES:
+- Give replies in 1-2 clear sentences
+- Do not diagnose or name illnesses
+- Advise general guidance and OTC meds when appropriate
+- Mention GP visit if needed
+- Use simple language for kids (<8) and minimal wording for elderly (>70)
+"""
+
 def safe_openai_response(prompt):
     response = client.chat.completions.create(
         model="gpt-4o-mini",
@@ -121,116 +149,109 @@ def safe_openai_response(prompt):
     return response.choices[0].message.content.strip()
 
 # -----------------------------
-# SESSION STATE
+# Emergency Check
+# -----------------------------
+EMERGENCY_RE = re.compile(
+    r"\bchest pain\b|\bdifficulty breathing\b|\bshortness of breath\b|\bunconscious\b|\bstroke\b",
+    re.IGNORECASE
+)
+
+# -----------------------------
+# Session State
 # -----------------------------
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-if "profile_saved" not in st.session_state:
-    st.session_state.profile_saved = False
+if "profile" not in st.session_state:
+    st.session_state.profile = {"age": "", "gender": "", "medical_history": ""}
 
 # -----------------------------
-# HEADER
+# Layout
 # -----------------------------
-st.markdown("## **VisitWise**")
-st.markdown("<span style='color:#475569'>AI-Powered triage assistant and symptom educator</span>", unsafe_allow_html=True)
+col1, col2 = st.columns([2, 1])
 
-# -----------------------------
-# LAYOUT
-# -----------------------------
-left, right = st.columns([3, 1.3], gap="medium")
+# Left: Chat
+with col1:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<h3>VisitWise Chat</h3>', unsafe_allow_html=True)
+    
+    # Display chat messages
+    for m in st.session_state.messages:
+        cls = "msg-user" if m["role"] == "user" else "msg-bot"
+        st.markdown(f'<div class="{cls}"><strong>{m["role"].capitalize()}:</strong><br>{m["content"]}</div>', unsafe_allow_html=True)
 
-# -----------------------------
-# CHAT COLUMN
-# -----------------------------
-with left:
-    st.markdown("<div class='card'>", unsafe_allow_html=True)
-    st.markdown("<div class='chatbox'>", unsafe_allow_html=True)
-
-    for msg in st.session_state.messages:
-        cls = "msg-user" if msg["role"] == "user" else "msg-bot"
-        label = "You" if msg["role"] == "user" else "VisitWise"
-        st.markdown(
-            f"<div class='{cls}'><strong>{label}:</strong><br>{msg['content']}</div>",
-            unsafe_allow_html=True
-        )
-
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    user_input = st.text_area(
-        "",
-        placeholder="Describe your symptoms (no personal names)",
-        height=80
-    )
+    user_input = st.text_area("Describe your symptoms (no personal names)", key="user_input", height=80)
 
     col_send, col_clear = st.columns([1,1])
-    send = col_send.button("Send")
-    clear = col_clear.button("Clear")
+    with col_send:
+        send = st.button("Send")
+    with col_clear:
+        clear = st.button("Clear")
 
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-# -----------------------------
-# PROFILE COLUMN
-# -----------------------------
-with right:
-    st.markdown("<div class='card'>", unsafe_allow_html=True)
-    st.markdown("### Profile (optional)")
-
-    age = st.number_input("Age", min_value=0, max_value=120, step=1)
-    gender = st.selectbox("Gender", ["Prefer not to say", "Female", "Male", "Non-binary", "Other"])
-    history = st.text_area("Medical history (optional)", height=80)
-
-    if st.button("Enter"):
-        if age or gender != "Prefer not to say" or history.strip():
-            st.session_state.profile_saved = True
-            st.success("Profile saved")
+# Right: Profile
+with col2:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("<h3>Profile (optional)</h3>", unsafe_allow_html=True)
+    age = st.number_input("Age", min_value=0, max_value=120, value=int(st.session_state.profile["age"] or 0))
+    gender = st.selectbox("Gender", ["Prefer not to say","Female","Male","Non-binary","Other"], index=0 if st.session_state.profile["gender"]=="" else ["Prefer not to say","Female","Male","Non-binary","Other"].index(st.session_state.profile["gender"]))
+    history = st.text_area("Medical history", value=st.session_state.profile["medical_history"], height=80)
+    
+    save_profile = st.button("Enter Profile")
+    save_box_html = '<div class="save-box saved">Profile saved</div>'
+    
+    if save_profile:
+        if not age and not gender and not history.strip():
+            st.markdown('<div class="save-box error">Fill profile first</div>', unsafe_allow_html=True)
         else:
-            st.error("Fill profile first")
+            st.session_state.profile = {"age": age, "gender": gender, "medical_history": history}
+            st.markdown(save_box_html, unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown("</div>", unsafe_allow_html=True)
+    # About card
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("<strong>About this site</strong>", unsafe_allow_html=True)
+    st.markdown("""
+    <p style="margin:8px 0;color:var(--muted);font-size:14px">
+    VisitWise is a triage assistant and does not diagnose or replace a GP. Filling in the profile helps curate the experience.
+    </p>
+    """, unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown("<div class='card'>", unsafe_allow_html=True)
-    st.markdown("**About this site**")
-    st.markdown(
-        "<span style='color:#475569;font-size:14px'>"
-        "VisitWise is a triage assistant and does not diagnose or replace a GP."
-        "</span>",
-        unsafe_allow_html=True
-    )
-    st.markdown("</div>", unsafe_allow_html=True)
+# Footer
+st.markdown('<footer>For emergencies call local services (999/112/911).</footer>', unsafe_allow_html=True)
 
 # -----------------------------
-# CHAT ACTIONS
+# Chat Logic
 # -----------------------------
-if clear:
-    st.session_state.messages = []
-    st.experimental_rerun()
-
 if send and user_input.strip():
-    st.session_state.messages.append({"role": "user", "content": user_input})
-
+    # Emergency check
     if EMERGENCY_RE.search(user_input):
         reply = "Your symptoms may be serious — please contact emergency services immediately."
     else:
-        prompt = f"""
+        user_prompt = f"""
 User message: {user_input}
-Age: {age}
-Gender: {gender}
-Medical history: {history}
+Age: {st.session_state.profile['age']}
+Gender: {st.session_state.profile['gender']}
+Medical history: {st.session_state.profile['medical_history']}
 
-Non-prescription items list:
+Non‑prescription items list:
 {MEDICINES}
-"""
-        with st.spinner("Thinking..."):
-            reply = safe_openai_response(prompt)
 
-    st.session_state.messages.append({"role": "assistant", "content": reply})
+Respond with general safe advice only.
+"""
+        reply = safe_openai_response(user_prompt)
+    
+    # Update session messages
+    st.session_state.messages.append({"role":"user", "content":user_input})
+    st.session_state.messages.append({"role":"bot", "content":reply})
+    
+    # Clear input box
+    st.session_state.user_input = ""
     st.experimental_rerun()
 
-# -----------------------------
-# FOOTER
-# -----------------------------
-st.markdown(
-    "<footer>For emergencies call local services (999 / 112 / 911).</footer>",
-    unsafe_allow_html=True
-)
+if clear:
+    st.session_state.messages = []
+    st.experimental_rerun()

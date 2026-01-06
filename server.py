@@ -20,6 +20,43 @@ COLORS = {
 }
 
 st.markdown(
+    """
+    <style>
+    .visitwise-banner {
+        background: linear-gradient(90deg, #e6f4ff, #dbeeff);
+        padding: 22px 32px;
+        border-radius: 16px;
+        margin-bottom: 18px;
+        box-shadow: 0 8px 20px rgba(43,124,255,0.08);
+    }
+    .visitwise-title {
+        font-size: 34px;
+        font-weight: 700;
+        color: #2b7cff;
+        margin-bottom: 4px;
+    }
+    .visitwise-subtitle {
+        font-size: 15px;
+        color: #475569;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+st.markdown(
+    """
+    <div class="visitwise-banner">
+        <div class="visitwise-title">VisitWise</div>
+        <div class="visitwise-subtitle">
+            AI-Powered triage assistant and symptom educator
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+st.markdown(
     f"""
     <style>
     .stApp {{background-color: {COLORS['bg']}; color: #0f172a;}}
@@ -162,5 +199,6 @@ if st.session_state.thinking:
 
 # ---------- FOOTER ----------
 st.markdown(f"<footer style='color:{COLORS['muted']}; margin-top:12px'>For emergencies call local services (999/112/911).</footer>", unsafe_allow_html=True)
+
 
 

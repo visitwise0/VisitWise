@@ -242,7 +242,7 @@ st.markdown('<footer>For emergencies call local services (999/112/911).</footer>
 # Chat Logic
 # -----------------------------
 if send and user_input.strip():
-  st.session_state.messages.append({"role";"user", "content":user_input})
+  st.session_state.messages.append({"role":"user", "content":user_input})
   st.session_state.user_input = ""
   st.session_state.thinking = True
   display_chat()
@@ -276,4 +276,5 @@ Respond with general safe advice only.
 if clear:
     st.session_state.messages = []
     st.experimental_rerun()
+
 

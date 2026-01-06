@@ -1,42 +1,77 @@
 import os
-
-key = os.getenv("OPENAI_API_KEY")
-
-if key:
-    print("API key found! It starts with:", key[:6] + "...")
-else:
-    print("API key NOT found.")
-import os
 import re
 import csv
-from flask import Flask, request, jsonify, render_template
+import streamlit as st
 from openai import OpenAI
 
-print("Running from:", os.getcwd())
+# -----------------------------
+# PAGE CONFIG
+# -----------------------------
+st.set_page_config(
+    page_title="VisitWise — AI triage assistant",
+    page_icon="🩺",
+    layout="wide"
+)
 
+# -----------------------------
+# STYLING (matches your HTML)
+# -----------------------------
+st.markdown("""
+<style>
+:root {
+  --bg:#e9f4ff;
+  --card:#ffffff;
+  --accent:#2b7cff;
+  --muted:#475569;
+}
+body { background-color: var(--bg); }
+
+.card {
+  background: var(--card);
+  padding: 14px;
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(20,30,60,0.06);
+}
+
+.chatbox {
+  height: 480px;
+  overflow-y: auto;
+  padding: 12px;
+  border-radius: 10px;
+  background: linear-gradient(180deg,#fff,#fbfeff);
+  border: 1px solid #e6f2ff;
+}
+
+.msg-user {
+  background: linear-gradient(90deg,#e6f4ff,#dbeeff);
+  padding: 10px;
+  border-radius: 12px;
+  margin: 8px 0 8px auto;
+  max-width: 80%;
+}
+
+.msg-bot {
+  background: linear-gradient(90deg,#fbfdff,#eef9ff);
+  padding: 10px;
+  border-radius: 12px;
+  margin: 8px auto 8px 0;
+  max-width: 80%;
+}
+
+footer {
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 12px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# -----------------------------
+# DATA / CONFIG
+# -----------------------------
 DATA_FOLDER = "data"
 CSV_PATH = os.path.join(DATA_FOLDER, "medicines.csv")
-
-# Fix double-extension bug if it exists
-if os.path.exists(os.path.join(DATA_FOLDER, "medicines.csv.csv")) and not os.path.exists(CSV_PATH):
-    os.rename(os.path.join(DATA_FOLDER, "medicines.csv.csv"), CSV_PATH)
-
-def load_medicines():
-    items = []
-    if not os.path.exists(CSV_PATH):
-        print("WARNING: medicines.csv not found")
-        return items
-    with open(CSV_PATH, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            items.append(row)
-    return items
-
-MEDICINES = load_medicines()
-print("Loaded", len(MEDICINES), "medicines")
-
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-app = Flask(__name__, template_folder="Templates")
 
 EMERGENCY_RE = re.compile(
     r"\bchest pain\b|\bdifficulty breathing\b|\bshortness of breath\b|\bunconscious\b|\bstroke\b",
@@ -45,24 +80,34 @@ EMERGENCY_RE = re.compile(
 
 SYSTEM_PROMPT = """
 You are VisitWise, a triage assistant and symptom educator.
-
-RULES:
-- If message begins with "I have" always address the user, regardless of age, but if message begins with "my son/daughter/child etc." address what the user can do to aid that person.
-- Give replies as if you are sending a friendly message to someone in one or two clear sentences.
-- Give consice short advice that is easily readable
-- Never name illnesses or conditions.
-- Never diagnose.
-- If question is nothing to do with Symptoms, please say "Please contain the conversation to medical advice" and do not respond further.
-- You are only answering medical questions.
-- Always mention to research reccommended dose amount for over the counter medication or include reccommended amount in medicine advise sentence.
-- Advise the Over-the-counter medications if you see fit.
-- Only give general guidance.
-- Advise seeing a GP if you see fit but only if Over-the-counter medication or other at home recovery methods will not suffice for the presumed illness.
-- Never name any illnesses or 
-- If symptoms sound severe, recommend urgent care.
-- You may reference non‑prescription products in general terms.
+Never diagnose or name illnesses.
+Give short, friendly, general advice only.
 """
 
+# -----------------------------
+# API KEY
+# -----------------------------
+api_key = os.getenv("OPENAI_API_KEY")
+if not api_key:
+    st.error("OpenAI API key not found. Add it to Streamlit Secrets.")
+    st.stop()
+
+client = OpenAI(api_key=api_key)
+
+# -----------------------------
+# LOAD CSV
+# -----------------------------
+def load_medicines():
+    if not os.path.exists(CSV_PATH):
+        return []
+    with open(CSV_PATH, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
+
+MEDICINES = load_medicines()
+
+# -----------------------------
+# OPENAI CALL
+# -----------------------------
 def safe_openai_response(prompt):
     response = client.chat.completions.create(
         model="gpt-4o-mini",
@@ -75,46 +120,117 @@ def safe_openai_response(prompt):
     )
     return response.choices[0].message.content.strip()
 
-@app.route("/")
-def home():
-    return render_template("index.html")
+# -----------------------------
+# SESSION STATE
+# -----------------------------
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-@app.route("/chat", methods=["POST"])
-def chat():
-    data = request.get_json() or {}
-    message = (data.get("message") or "").strip()
-    age = (data.get("age") or "").strip()
-    gender = (data.get("gender") or "").strip()
-    history = (data.get("medical_history") or "").strip()
+if "profile_saved" not in st.session_state:
+    st.session_state.profile_saved = False
 
-    if not message:
-        return jsonify({"error": "Empty message"})
+# -----------------------------
+# HEADER
+# -----------------------------
+st.markdown("## **VisitWise**")
+st.markdown("<span style='color:#475569'>AI-Powered triage assistant and symptom educator</span>", unsafe_allow_html=True)
 
-    if EMERGENCY_RE.search(message):
-        return jsonify({"reply": "Your symptoms may be serious — please contact emergency services immediately."})
+# -----------------------------
+# LAYOUT
+# -----------------------------
+left, right = st.columns([3, 1.3], gap="medium")
 
-    user_prompt = f"""
-User message: {message}
+# -----------------------------
+# CHAT COLUMN
+# -----------------------------
+with left:
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
+    st.markdown("<div class='chatbox'>", unsafe_allow_html=True)
+
+    for msg in st.session_state.messages:
+        cls = "msg-user" if msg["role"] == "user" else "msg-bot"
+        label = "You" if msg["role"] == "user" else "VisitWise"
+        st.markdown(
+            f"<div class='{cls}'><strong>{label}:</strong><br>{msg['content']}</div>",
+            unsafe_allow_html=True
+        )
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    user_input = st.text_area(
+        "",
+        placeholder="Describe your symptoms (no personal names)",
+        height=80
+    )
+
+    col_send, col_clear = st.columns([1,1])
+    send = col_send.button("Send")
+    clear = col_clear.button("Clear")
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# -----------------------------
+# PROFILE COLUMN
+# -----------------------------
+with right:
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
+    st.markdown("### Profile (optional)")
+
+    age = st.number_input("Age", min_value=0, max_value=120, step=1)
+    gender = st.selectbox("Gender", ["Prefer not to say", "Female", "Male", "Non-binary", "Other"])
+    history = st.text_area("Medical history (optional)", height=80)
+
+    if st.button("Enter"):
+        if age or gender != "Prefer not to say" or history.strip():
+            st.session_state.profile_saved = True
+            st.success("Profile saved")
+        else:
+            st.error("Fill profile first")
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
+    st.markdown("**About this site**")
+    st.markdown(
+        "<span style='color:#475569;font-size:14px'>"
+        "VisitWise is a triage assistant and does not diagnose or replace a GP."
+        "</span>",
+        unsafe_allow_html=True
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# -----------------------------
+# CHAT ACTIONS
+# -----------------------------
+if clear:
+    st.session_state.messages = []
+    st.experimental_rerun()
+
+if send and user_input.strip():
+    st.session_state.messages.append({"role": "user", "content": user_input})
+
+    if EMERGENCY_RE.search(user_input):
+        reply = "Your symptoms may be serious — please contact emergency services immediately."
+    else:
+        prompt = f"""
+User message: {user_input}
 Age: {age}
 Gender: {gender}
 Medical history: {history}
 
-Non‑prescription items list:
+Non-prescription items list:
 {MEDICINES}
-
-Rules:
--Do not diagnose users
--If users age is less than 8 please use simplified language as talking to a child.
--If users age is more than 70 please user minimal wording.
--Refer to medicine.csv file and advise certain over-the-counter medicines if considered necessary.
--Advise GP visit if considered necessary.
--Please take Age, Gender and Medical history into account to curate answers.
-
-Respond with general safe advice only.
 """
+        with st.spinner("Thinking..."):
+            reply = safe_openai_response(prompt)
 
-    reply = safe_openai_response(user_prompt)
-    return jsonify({"reply": reply})
+    st.session_state.messages.append({"role": "assistant", "content": reply})
+    st.experimental_rerun()
 
-if __name__ == "__main__":
-    app.run(debug=True)
+# -----------------------------
+# FOOTER
+# -----------------------------
+st.markdown(
+    "<footer>For emergencies call local services (999 / 112 / 911).</footer>",
+    unsafe_allow_html=True
+)

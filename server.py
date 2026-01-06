@@ -266,7 +266,7 @@ Non‑prescription items list:
 
 Respond with general safe advice only.
 """
-        reply = safe_openai_response(user_prompt)
+    reply = safe_openai_response(user_prompt)
     
     # Update session messages
     st.session_state.messages.append({"role":"user", "content":user_input})
@@ -276,6 +276,7 @@ Respond with general safe advice only.
 if clear:
     st.session_state.messages = []
     st.experimental_rerun()
+
 
 
 

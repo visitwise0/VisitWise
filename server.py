@@ -251,11 +251,11 @@ if send and user_input.strip():
 elif st.session_state.thinking:
   last_user_msg = st.session_state.messages[-1]["content"]
   
-    # Emergency check
-    if EMERGENCY_RE.search(user_input):
-        reply = "Your symptoms may be serious — please contact emergency services immediately."
-    else:
-        user_prompt = f"""
+  # Emergency check
+  if EMERGENCY_RE.search(user_input):
+      reply = "Your symptoms may be serious — please contact emergency services immediately."
+  else:
+      user_prompt = f"""
 User message: {user_input}
 Age: {st.session_state.profile['age']}
 Gender: {st.session_state.profile['gender']}
@@ -276,5 +276,6 @@ Respond with general safe advice only.
 if clear:
     st.session_state.messages = []
     st.experimental_rerun()
+
 
 

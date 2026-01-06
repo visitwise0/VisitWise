@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>VisitWise — AI triage assistant</title>
+  <style>
+    :root {
+      --bg:#e9f4ff;
+      --card:#ffffff;
+      --accent:#2b7cff;
+      --muted:#475569;
+      --soft:#eaf6ff;
+      --savebox-dark:#003a99;
+      --savebox-light:#4d8fff;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,Arial,Helvetica,sans-serif;background:var(--bg);color:#0f172a}
+    .wrap{max-width:1100px;margin:28px auto;padding:20px}
+    .header{display:flex;align-items:baseline;gap:14px}
+    .logo{font-weight:800;font-size:34px;color:var(--accent);position:relative}
+    .subtitle{color:var(--muted);margin-top:6px;margin-left:6px}
+    .layout{display:grid;grid-template-columns:1fr 340px;gap:18px;margin-top:18px}
+    @media(max-width:980px){.layout{grid-template-columns:1fr}}
+    .card{background:var(--card);padding:14px;border-radius:12px;box-shadow:0 8px 20px rgba(20,30,60,0.06)}
+    /* Chat column */
+    #messages{height:480px;overflow:auto;padding:12px;border-radius:10px;background:linear-gradient(180deg,#fff,#fbfeff);border:1px solid #e6f2ff}
+    .msg{margin:10px 0;padding:10px;border-radius:12px;max-width:80%}
+    .msg.user{margin-left:auto;background:linear-gradient(90deg,#e6f4ff,#dbeeff);text-align:right}
+    .msg.bot{margin-right:auto;background:linear-gradient(90deg,#fbfdff,#eef9ff)}
+    .controls{display:flex;gap:8px;margin-top:12px}
+    textarea.input{width:100%;padding:10px;border-radius:8px;border:1px solid #e6eefc;resize:vertical}
+    button.primary{background:var(--accent);color:white;border:none;padding:10px 14px;border-radius:10px;cursor:pointer}
+    button.secondary{background:transparent;border:1px solid #dbeeff;padding:8px 12px;border-radius:8px;cursor:pointer}
+    /* Right column */
+    .profile-row{display:flex;gap:8px;align-items:center;margin:8px 0}
+    label{width:110px;color:var(--muted)}
+    input[type=number], select, textarea{
+      width:100%;padding:8px;border-radius:8px;border:1px solid #e6eefc;
+    }
+
+    /* Prevent medical history resize */
+    #medical_history { resize: none; }
+
+    /* Profile save box */
+    #saveBox {
+      background: var(--savebox-dark);
+      color: white;
+      padding: 10px;
+      border-radius: 8px;
+      margin-top: 10px;
+      text-align: center;
+      font-weight: 600;
+      transition: background 0.4s ease;
+      display: none; /* Start hidden */
+    }
+    footer{margin-top:12px;text-align:center;color:var(--muted);font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <div class="logo">VisitWise</div>
+      <div><div class="subtitle">AI‑Powered triage assistant and symptom educator</div></div>
+    </div>
+    <div class="layout">
+      <!-- Left Chat -->
+      <div class="card">
+        <div id="messages" aria-live="polite"></div>
+        <div style="margin-top:12px">
+          <textarea id="messageInput" class="input" rows="3" placeholder="Describe your symptoms (no personal names)"></textarea>
+          <div class="controls">
+            <button class="primary" id="sendBtn">Send</button>
+            <button class="secondary" id="clearBtn">Clear</button>
+          </div>
+        </div>
+      </div>
+      <!-- Right Column -->
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="card">
+          <h3 style="margin:0 0 8px 0">Profile (optional)</h3>
+          <div class="profile-row">
+            <label>Age</label><input id="age" type="number" min="0" max="120" placeholder="e.g. 29">
+          </div>
+          <div class="profile-row">
+            <label>Gender</label>
+            <select id="gender">
+              <option value="">Prefer not to say</option>
+              <option>Female</option>
+              <option>Male</option>
+              <option>Non-binary</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="profile-row" style="flex-direction:column; align-items:stretch;">
+            <label style="margin-bottom:6px;">Medical history (optional)</label>
+            <textarea id="medical_history" rows="4" placeholder='e.g. "Asthma" or "Hay Fever"' style="width:100%;padding:8px;border-radius:8px;border:1px solid #e6eefc;"></textarea>
+          </div>
+          <!-- SAVE PROFILE BUTTON -->
+          <button id="saveProfileBtn" class="primary" style="width:100%;margin-top:10px;">Enter</button>
+          <!-- SAVED BOX -->
+          <div id="saveBox">Profile saved</div>
+        </div>
+        <div class="card">
+          <strong>About this site</strong>
+          <p style="margin:8px 0;color:var(--muted);font-size:14px">
+            VisitWise is a triage assistant and does not diagnose or replace a GP. This website has been made in mind of helping the general public. Filling in the profile helps curate the user experience.
+          </p>
+        </div>
+      </div>
+    </div>
+    <footer>
+      <div>For emergencies call local services (999/112/911).</div>
+    </footer>
+  </div>
+<script>
+  const messages = document.getElementById("messages");
+  const input = document.getElementById("messageInput");
+  const sendBtn = document.getElementById("sendBtn");
+  const clearBtn = document.getElementById("clearBtn");
+  const ageEl = document.getElementById("age");
+  const genderEl = document.getElementById("gender");
+  const historyEl = document.getElementById("medical_history");
+
+  const saveBtn = document.getElementById("saveProfileBtn");
+  const saveBox = document.getElementById("saveBox");
+
+  saveBtn.addEventListener("click", () => {
+      if (!ageEl.value && !genderEl.value && !historyEl.value.trim()) {
+          saveBox.textContent = "Fill profile first";
+          saveBox.style.background = "red";
+          saveBox.style.display = "block";
+          return;
+      }
+      saveBox.textContent = "Profile saved";
+      saveBox.style.background = "var(--savebox-light)";
+      saveBox.style.display = "block";
+      setTimeout(() => {
+        saveBox.style.background = "var(--savebox-dark)";
+      }, 300);
+  });
+
+  function appendMessage(html, cls="bot") {
+    const d = document.createElement("div");
+    d.className = "msg " + (cls === "user" ? "user" : "bot");
+    d.innerHTML = html;
+    messages.appendChild(d);
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  sendBtn.addEventListener("click", async () => {
+    const text = input.value.trim();
+    if (!text) return;
+    appendMessage("<strong>You:</strong><br>" + text, "user");
+    input.value = "";
+    appendMessage("Thinking...", "bot");
+    try {
+      const resp = await fetch("/chat", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({
+          message: text,
+          age: ageEl.value,
+          gender: genderEl.value,
+          medical_history: historyEl.value
+        })
+      });
+      const data = await resp.json();
+      const nodes = document.querySelectorAll("#messages .msg");
+      if (nodes.length && nodes[nodes.length-1].textContent === "Thinking...")
+        nodes[nodes.length-1].remove();
+      if (data.reply) appendMessage("<strong>VisitWise:</strong><br>" + data.reply);
+      else appendMessage("No reply received.", "bot");
+    } catch (err) {
+      appendMessage("<strong>Error:</strong> Could not reach server: " + err.message, "bot");
+    }
+  });
+
+  clearBtn.addEventListener("click", () => { messages.innerHTML = ""; });
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendBtn.click(); }
+  });
+</script>
+</body>
+</html>

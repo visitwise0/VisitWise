@@ -22,6 +22,11 @@ COLORS = {
 st.markdown(
     """
     <style>
+    .stApp {{background-color: {COLORS['bg']}; color: #0f172a;}}
+    .user-msg {{background: linear-gradient(90deg,#e6f4ff,#dbeeff); padding: 10px; border-radius: 12px; max-width: 80%; margin-left: auto; margin-bottom: 6px;}}
+    .bot-msg {{background: linear-gradient(90deg,#fbfdff,#eef9ff); padding: 10px; border-radius: 12px; max-width: 80%; margin-right: auto; margin-bottom: 6px;}}
+    .thinking {{font-style: italic; color: {COLORS['accent']};}}
+    
     .visitwise-banner {
         background: linear-gradient(90deg, #e6f4ff, #dbeeff);
         padding: 22px 32px;
@@ -80,18 +85,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.markdown(
-    f"""
-    <style>
-    .stApp {{background-color: {COLORS['bg']}; color: #0f172a;}}
-    .user-msg {{background: linear-gradient(90deg,#e6f4ff,#dbeeff); padding: 10px; border-radius: 12px; max-width: 80%; margin-left: auto; margin-bottom: 6px;}}
-    .bot-msg {{background: linear-gradient(90deg,#fbfdff,#eef9ff); padding: 10px; border-radius: 12px; max-width: 80%; margin-right: auto; margin-bottom: 6px;}}
-    .thinking {{font-style: italic; color: {COLORS['accent']};}}
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
 # ---------- DATA ----------
 DATA_FOLDER = "data"
 CSV_PATH = os.path.join(DATA_FOLDER, "medicines.csv")
@@ -133,6 +126,13 @@ with st.sidebar:
         value=st.session_state.profile["medical_history"],
         height=80
     )
+
+# ---------- DISPLAY CHAT ----------
+for msg in st.session_state.messages:
+    if msg["role"] == "user":
+        st.markdown(f'<div class="user-msg"><strong>You:</strong> {msg["content"]}</div>', unsafe_allow_html=True)
+    else:
+        st.markdown(f'<div class="bot-msg"><strong>VisitWise:</strong> {msg["content"]}</div>', unsafe_allow_html=True)
 
 # ---------- CHAT AREA ----------
 st.markdown(
@@ -226,19 +226,13 @@ Respond with general safe advice only.
     st.session_state.messages.append({"role": "bot", "content": reply})
     st.session_state.thinking = False
 
-# ---------- DISPLAY CHAT ----------
-for msg in st.session_state.messages:
-    if msg["role"] == "user":
-        st.markdown(f'<div class="user-msg"><strong>You:</strong> {msg["content"]}</div>', unsafe_allow_html=True)
-    else:
-        st.markdown(f'<div class="bot-msg"><strong>VisitWise:</strong> {msg["content"]}</div>', unsafe_allow_html=True)
-
 # ---------- SHOW THINKING ----------
 if st.session_state.thinking:
     st.markdown('<div class="thinking">VisitWise is thinking...</div>', unsafe_allow_html=True)
 
 # ---------- FOOTER ----------
 st.markdown(f"<footer style='color:{COLORS['muted']}; margin-top:12px'>For emergencies call local services (999/112/911).</footer>", unsafe_allow_html=True)
+
 
 
 

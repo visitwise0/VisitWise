@@ -3,6 +3,7 @@ import re
 import csv
 import streamlit as st
 from openai import OpenAI
+import time
 
 # -----------------------------
 # App Config & Colors
@@ -65,6 +66,7 @@ span, p {
   border-radius: 12px;
   margin: 8px auto 8px 0;
   max-width: 80%;
+  word-wrap: break-word;
 }
 
 /* Profile saved box */
@@ -85,6 +87,16 @@ span, p {
 .save-box.error {
   background-color: red;
   display: block;
+}
+
+/* Chat container */
+#chat-container {
+height: 480px;
+overflow-y: auto;
+padding: 12px;
+border-radius: 10px;
+background: linear-gradient(180deg,#fff,#fbfeff);
+border: 1px solid #e6f2ff;
 }
 
 /* Footer */
@@ -165,6 +177,9 @@ if "messages" not in st.session_state:
 if "profile" not in st.session_state:
     st.session_state.profile = {"age": "", "gender": "", "medical_history": ""}
 
+if "thinking" not in st.session_state:
+    st.session_state.thinking = False
+  
 # -----------------------------
 # Layout
 # -----------------------------
@@ -227,6 +242,15 @@ st.markdown('<footer>For emergencies call local services (999/112/911).</footer>
 # Chat Logic
 # -----------------------------
 if send and user_input.strip():
+  st.session_state.messages.append({"role";"user", "content":user_input})
+  st.session_state.user_input = ""
+  st.session_state.thinking = True
+  display_chat()
+  st.experimental_rerun()
+
+elif st.session_state.thinking:
+  last_user_msg = st.session_state.messages[-1]["content"]
+  
     # Emergency check
     if EMERGENCY_RE.search(user_input):
         reply = "Your symptoms may be serious — please contact emergency services immediately."
@@ -246,12 +270,10 @@ Respond with general safe advice only.
     
     # Update session messages
     st.session_state.messages.append({"role":"user", "content":user_input})
-    st.session_state.messages.append({"role":"bot", "content":reply})
-    
-    # Clear input box
-    st.session_state.user_input = ""
+    st.session_state.thinking = False
     st.experimental_rerun()
 
 if clear:
     st.session_state.messages = []
     st.experimental_rerun()
+

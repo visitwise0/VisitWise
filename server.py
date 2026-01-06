@@ -75,8 +75,10 @@ with st.sidebar:
 
 # ---------- CHAT AREA ----------
 st.markdown("## Chat with VisitWise")
-user_input = st.text_area("Describe your symptoms", key="user_input", height=60)
-send = st.button("Send")
+
+with st.form(key="chat_form", "clear_on_submit=True):
+    user_input = st.text_area("Describe your symptoms", height=60)
+    send = st.form_submit_button("Send")
 
 # ---------- EMERGENCY REGEX ----------
 EMERGENCY_RE = re.compile(
@@ -123,7 +125,6 @@ def safe_openai_response(prompt):
 if send and user_input.strip():
     st.session_state.messages.append({"role": "user", "content": user_input})
     st.session_state.thinking = True
-    st.session_state.user_input = ""
 
 # ---------- PROCESS BOT RESPONSE ----------
 if st.session_state.thinking and st.session_state.messages:
@@ -161,3 +162,4 @@ if st.session_state.thinking:
 
 # ---------- FOOTER ----------
 st.markdown(f"<footer style='color:{COLORS['muted']}; margin-top:12px'>For emergencies call local services (999/112/911).</footer>", unsafe_allow_html=True)
+

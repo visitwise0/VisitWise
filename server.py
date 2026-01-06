@@ -54,6 +54,15 @@ st.markdown(
         background-color: #1f66e5;
         color: white;
     }
+    
+    .chat-card {
+        background: #ffffff;
+        padding: 16px;
+        border-radius: 16px;
+        box-shadow: 0 10px 25px rgba(15, 23, 42, 0.06);
+        margin-bottom: 12px;
+    }
+
     </style>
     """,
     unsafe_allow_html=True
@@ -230,6 +239,7 @@ if st.session_state.thinking:
 
 # ---------- FOOTER ----------
 st.markdown(f"<footer style='color:{COLORS['muted']}; margin-top:12px'>For emergencies call local services (999/112/911).</footer>", unsafe_allow_html=True)
+
 
 
 

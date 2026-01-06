@@ -111,7 +111,19 @@ with st.sidebar:
     )
 
 # ---------- CHAT AREA ----------
-st.markdown("## Chat with VisitWise")
+st.markdown(
+    """
+    <div style="
+        font-size:18px;
+        font-weight:600;
+        color:#475569;
+        margin-bottom:6px;
+    ">
+        Chat with VisitWise
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 with st.form(key="chat_form", clear_on_submit=True):
     user_input = st.text_area("Describe your symptoms", height=60)
@@ -199,6 +211,7 @@ if st.session_state.thinking:
 
 # ---------- FOOTER ----------
 st.markdown(f"<footer style='color:{COLORS['muted']}; margin-top:12px'>For emergencies call local services (999/112/911).</footer>", unsafe_allow_html=True)
+
 
 
 
